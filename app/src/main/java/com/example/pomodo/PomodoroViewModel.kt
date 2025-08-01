@@ -110,7 +110,7 @@ class PomodoroViewModel(
                     _currentTime.value--
                 }
 
-                if (_currentTime.value == 0) {
+                if (_currentTime.value == 0 && _timerState.value == TimerState.RUNNING) {
                     handleTimerCompletion()
                 }
             }
@@ -180,7 +180,7 @@ class PomodoroViewModel(
         _longBreakTime.value = timer.longBreakMinutes * 60
         _longBreakInterval.value = timer.longBreakInterval
 
-        if (_timerState.value == TimerState.STOPPED || _currentMode.value == TimerMode.FOCUS) {
+        if (_timerState.value == TimerState.STOPPED) {
             _currentTime.value = _focusTime.value
             _currentMode.value = TimerMode.FOCUS
             _cyclesCompleted.value = 0

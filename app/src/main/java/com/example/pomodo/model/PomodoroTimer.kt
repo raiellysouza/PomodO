@@ -22,4 +22,10 @@ data class StatsData(
     val last90Days: Long
 )
 
+data class FocusStats(
+    val totalPomodoros: Int = 0,
+    val totalFocusMinutes: Int = 0,
+    val dailyAverageMinutes: Int = 0
+)
+
 

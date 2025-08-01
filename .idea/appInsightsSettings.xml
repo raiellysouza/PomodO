@@ -9,9 +9,9 @@
               <option name="connection">
                 <ConnectionSetting>
                   <option name="appId" value="com.example.pomodo" />
-                  <option name="mobileSdkAppId" value="1:415957507999:android:0eba8d5caf34538124a7aa" />
-                  <option name="projectId" value="pomodoapp-c169c" />
-                  <option name="projectNumber" value="415957507999" />
+                  <option name="mobileSdkAppId" value="1:228672506763:android:a86f8a210cd9e4e398bd8e" />
+                  <option name="projectId" value="pomodo-e58da" />
+                  <option name="projectNumber" value="228672506763" />
                 </ConnectionSetting>
               </option>
               <option name="signal" value="SIGNAL_UNSPECIFIED" />

@@ -10,15 +10,26 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun UserNameEditor(name: String, onNameChange: (String) -> Unit, onSaveName: () -> Unit) {
+fun UserNameEditor(name: String, onNameChange: (String) -> Unit, onSaveName: (String) -> Unit) {
     var text by remember { mutableStateOf(name) }
-    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
         OutlinedTextField(
             value = text,
-            onValueChange = { text = it; onNameChange(it) },
-            modifier = Modifier.fillMaxWidth()
+            onValueChange = {
+                text = it
+                onNameChange(it)
+            },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Nome") }
         )
-        Button(onClick = onSaveName, modifier = Modifier.align(Alignment.End)) {
+        Button(
+            onClick = { onSaveName(text) },
+            modifier = Modifier.align(Alignment.End)
+        ) {
             Text("Salvar")
         }
     }

@@ -47,4 +47,27 @@ class UserRepository(
             last90Days = snap.getLong("last90Days") ?: 0
         )
     }
+
+    suspend fun updateStudyStats(uid: String, stats: StatsData) {
+        val data = mapOf(
+            "daily" to stats.daily,
+            "weekly" to stats.weekly,
+            "monthly" to stats.monthly,
+            "last90Days" to stats.last90Days
+        )
+        firestore.collection("users").document(uid).collection("stats").document("summary").set(data).await()
+    }
+
+    suspend fun savePomodoroTimer(uid: String, timerId: String, timerData: Map<String, Any>) {
+        firestore.collection("users").document(uid).collection("pomodoroTimers").document(timerId).set(timerData).await()
+    }
+
+    suspend fun getPomodoroTimers(uid: String): List<Map<String, Any>> {
+        val snapshot = firestore.collection("users").document(uid).collection("pomodoroTimers").get().await()
+        return snapshot.documents.map { it.data ?: emptyMap() }
+    }
+
+    suspend fun deletePomodoroTimer(uid: String, timerId: String) {
+        firestore.collection("users").document(uid).collection("pomodoroTimers").document(timerId).delete().await()
+    }
 }

@@ -2,117 +2,88 @@ package com.example.pomodo.data
 
 import com.example.pomodo.model.PomodoroTimer
 import com.example.pomodo.local.PomodoroTimerDao
-import com.example.pomodo.local.PomodoroTimerEntity
 import com.example.pomodo.local.toDomain
 import com.example.pomodo.local.toEntity
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.ktx.toObject
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.tasks.await
-import android.util.Log
 
 class PomodoroTimerRepository(
     private val firestore: FirebaseFirestore,
     private val auth: FirebaseAuth,
     private val pomodoroTimerDao: PomodoroTimerDao
 ) {
-    val pomodoroTimers: Flow<List<PomodoroTimer>> = pomodoroTimerDao.getAllTimers().map { entities ->
-        entities.map { it.toDomain() }
-    }
+    private val _pomodoroTimers = MutableStateFlow<List<PomodoroTimer>>(emptyList())
+    val pomodoroTimers: StateFlow<List<PomodoroTimer>> = _pomodoroTimers
 
     suspend fun refreshTimersFromFirebase() {
-        try {
-            val userId = auth.currentUser?.uid
-            if (userId != null) {
-                val snapshot = firestore.collection("users").document(userId)
-                    .collection("pomodoroTimers")
-                    .get()
-                    .await()
-                val remoteTimers = snapshot.documents.mapNotNull { doc ->
-                    try {
-                        doc.toObject(PomodoroTimer::class.java)?.copy(id = doc.id)
-                    } catch (e: Exception) {
-                        Log.e("PomodoroTimerRepository", "Erro ao mapear documento Firestore para PomodoroTimer: ${e.message}", e)
-                        null
-                    }
-                }
-                val remoteEntities = remoteTimers.map { it.toEntity(isSynced = true) }
-                pomodoroTimerDao.deleteAll()
-                pomodoroTimerDao.insertAll(remoteEntities)
-                Log.d("PomodoroTimerRepository", "Timers sincronizados do Firebase para o Room.")
-            } else {
-                Log.d("PomodoroTimerRepository", "Usuário não autenticado, não foi possível sincronizar timers do Firebase.")
-            }
-        } catch (e: Exception) {
-            Log.e("PomodoroTimerRepository", "Erro ao sincronizar timers do Firebase: ${e.message}", e)
+        val uid = auth.currentUser?.uid ?: return
+
+        val snapshot = firestore.collection("users")
+            .document(uid)
+            .collection("pomodoroTimers")
+            .get()
+            .await()
+
+        val timers = snapshot.documents.mapNotNull { doc ->
+            doc.toObject(PomodoroTimer::class.java)?.copy(id = doc.id)
         }
+
+        pomodoroTimerDao.deleteAll() // limpa cache local
+
+        // Insere convertendo para entidade
+        pomodoroTimerDao.insertAll(timers.map { it.toEntity(isSynced = true) })
+
+        _pomodoroTimers.value = timers
     }
 
     suspend fun addTimer(timer: PomodoroTimer) {
-        val userId = auth.currentUser?.uid
-        if (userId == null) {
-            throw IllegalStateException("Usuário não autenticado para adicionar timer.")
-        }
+        val uid = auth.currentUser?.uid ?: return
+        val docRef = firestore.collection("users")
+            .document(uid)
+            .collection("pomodoroTimers")
+            .document()
 
-        try {
-            val docRef = firestore.collection("users")
-                .document(userId)
-                .collection("pomodoroTimers")
-                .add(timer)
-                .await()
+        val timerWithId = timer.copy(id = docRef.id)
+        docRef.set(timerWithId).await()
 
-            pomodoroTimerDao.insertTimer(timer.copy(id = docRef.id).toEntity(isSynced = true))
-            Log.d("PomodoroTimerRepository", "Timer '${timer.name}' adicionado ao Firestore e Room com ID: ${docRef.id}")
-        } catch (e: Exception) {
-            Log.e("PomodoroTimerRepository", "Erro ao adicionar timer: ${e.message}", e)
-            throw e
-        }
+        pomodoroTimerDao.insertTimer(timerWithId.toEntity(isSynced = true))
+
+        _pomodoroTimers.value = _pomodoroTimers.value + timerWithId
     }
 
     suspend fun updateTimer(timer: PomodoroTimer) {
-        val userId = auth.currentUser?.uid
-        if (userId == null) {
-            throw IllegalStateException("Usuário não autenticado para atualizar timer.")
-        }
-        timer.id?.let { timerId ->
-            try {
-                firestore.collection("users")
-                    .document(userId)
-                    .collection("pomodoroTimers")
-                    .document(timerId)
-                    .set(timer)
-                    .await()
+        val uid = auth.currentUser?.uid ?: return
+        val remoteId = timer.id ?: return
 
-                pomodoroTimerDao.updateTimer(timer.toEntity(isSynced = true))
-                Log.d("PomodoroTimerRepository", "Timer '${timer.name}' (ID: ${timerId}) atualizado no Firestore e Room.")
-            } catch (e: Exception) {
-                Log.e("PomodoroTimerRepository", "Erro ao atualizar timer: ${e.message}", e)
-                throw e
-            }
-        } ?: throw IllegalArgumentException("ID do timer é necessário para atualização.")
+        firestore.collection("users")
+            .document(uid)
+            .collection("pomodoroTimers")
+            .document(remoteId)
+            .set(timer)
+            .await()
+
+        pomodoroTimerDao.updateTimer(timer.toEntity(isSynced = true))
+
+        _pomodoroTimers.value = _pomodoroTimers.value.map {
+            if (it.id == remoteId) timer else it
+        }
     }
 
-    suspend fun deleteTimer(timerId: String) {
-        val userId = auth.currentUser?.uid
-        if (userId == null) {
-            throw IllegalStateException("Usuário não autenticado para excluir timer.")
-        }
+    suspend fun deleteTimer(remoteId: String) {
+        val uid = auth.currentUser?.uid ?: return
 
-        try {
-            firestore.collection("users")
-                .document(userId)
-                .collection("pomodoroTimers")
-                .document(timerId)
-                .delete()
-                .await()
+        firestore.collection("users")
+            .document(uid)
+            .collection("pomodoroTimers")
+            .document(remoteId)
+            .delete()
+            .await()
 
-            pomodoroTimerDao.deleteTimerByRemoteId(timerId)
-            Log.d("PomodoroTimerRepository", "Timer (ID: $timerId) excluído do Firestore e Room.")
-        } catch (e: Exception) {
-            Log.e("PomodoroTimerRepository", "Erro ao excluir timer: ${e.message}", e)
-            throw e
-        }
+        pomodoroTimerDao.deleteTimerByRemoteId(remoteId)
+
+        _pomodoroTimers.value = _pomodoroTimers.value.filter { it.id != remoteId }
     }
 }

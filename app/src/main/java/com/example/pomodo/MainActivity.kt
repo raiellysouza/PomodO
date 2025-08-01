@@ -108,7 +108,7 @@ class MainActivity : ComponentActivity() {
                             Divider()
                             NavigationDrawerItem(
                                 label = { Text("Sair") },
-                                icon = { Icon(Icons.Filled.Person, contentDescription = "Sair") },
+                                icon = { Icon(Icons.Filled.ExitToApp, contentDescription = "Sair") },
                                 selected = false,
                                 onClick = {
                                     scope.launch {

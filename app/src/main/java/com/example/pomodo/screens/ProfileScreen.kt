@@ -1,5 +1,6 @@
 package com.example.pomodo.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -7,6 +8,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.pomodo.ui.profile.ProfileViewModel
@@ -21,7 +23,11 @@ fun ProfileScreen(
     viewModel: ProfileViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
-    LaunchedEffect(Unit) { viewModel.loadProfile() }
+
+    LaunchedEffect(Unit) {
+        viewModel.loadProfile()
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -42,15 +48,24 @@ fun ProfileScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            ProfilePictureUploader(
-                photoUrl = state.profile?.photoUrl ?: "",
-                onPictureSelected = viewModel::onPictureSelected
-            )
+            Box(
+                modifier = Modifier
+                    .size(120.dp)
+                    .background(Color.LightGray),
+                contentAlignment = Alignment.Center
+            ) {
+                ProfilePictureUploader(
+                    photoUrl = state.profile?.photoUrl ?: "",
+                    onPictureSelected = viewModel::onPictureSelected
+                )
+            }
+
             UserNameEditor(
                 name = state.profile?.displayName ?: "",
                 onNameChange = viewModel::onNameChange,
-                onSaveName = viewModel::onSaveName
+                onSaveName = { viewModel.onSaveName() }
             )
+
             StatsChart(stats = state.stats)
         }
     }
