@@ -31,7 +31,6 @@ import com.example.pomodo.ui.profile.ProfileViewModel
 import com.example.pomodo.ui.theme.PomodoTheme
 import com.example.pomodo.ui.theme.ThemeViewModel
 import com.example.pomodo.PomodoroViewModel
-import com.example.pomodo.data.UserRepository
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore

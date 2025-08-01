@@ -1,14 +1,11 @@
 package com.example.pomodo.local
 
-import androidx.room.Dao
-import androidx.room.Insert
-import androidx.room.OnConflictStrategy
-import androidx.room.Query
-import androidx.room.Update
+import androidx.room.*
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface PomodoroTimerDao {
+
     @Query("SELECT * FROM pomodoro_timers_cache ORDER BY name ASC")
     fun getAllTimers(): Flow<List<PomodoroTimerEntity>>
 
@@ -33,4 +30,3 @@ interface PomodoroTimerDao {
     @Query("DELETE FROM pomodoro_timers_cache")
     suspend fun deleteAll()
 }
-

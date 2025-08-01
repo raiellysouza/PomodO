@@ -7,8 +7,8 @@ import com.example.pomodo.model.PomodoroTimer
 @Entity(tableName = "pomodoro_timers_cache")
 data class PomodoroTimerEntity(
     @PrimaryKey(autoGenerate = true)
-    val id: Long = 0,
-    val remoteId: String? = null,
+    val id: Long = 0,             // ID local Room
+    val remoteId: String? = null, // ID Firestore
     val name: String,
     val focusMinutes: Int,
     val shortBreakMinutes: Int,
@@ -19,7 +19,7 @@ data class PomodoroTimerEntity(
 
 fun PomodoroTimerEntity.toDomain(): PomodoroTimer {
     return PomodoroTimer(
-        id = this.remoteId,
+        id = this.remoteId ?: "",
         name = this.name,
         focusMinutes = this.focusMinutes,
         shortBreakMinutes = this.shortBreakMinutes,
@@ -40,4 +40,3 @@ fun PomodoroTimer.toEntity(localId: Long = 0, isSynced: Boolean = false): Pomodo
         isSynced = isSynced
     )
 }
-

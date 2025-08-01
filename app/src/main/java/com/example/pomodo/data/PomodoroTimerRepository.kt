@@ -1,89 +1,69 @@
 package com.example.pomodo.data
 
-import com.example.pomodo.model.PomodoroTimer
 import com.example.pomodo.local.PomodoroTimerDao
+import com.example.pomodo.local.PomodoroTimerEntity
 import com.example.pomodo.local.toDomain
 import com.example.pomodo.local.toEntity
-import com.google.firebase.auth.FirebaseAuth
+import com.example.pomodo.model.PomodoroTimer
 import com.google.firebase.firestore.FirebaseFirestore
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 class PomodoroTimerRepository(
-    private val firestore: FirebaseFirestore,
-    private val auth: FirebaseAuth,
-    private val pomodoroTimerDao: PomodoroTimerDao
+    private val dao: PomodoroTimerDao,
+    private val firestore: FirebaseFirestore
 ) {
-    private val _pomodoroTimers = MutableStateFlow<List<PomodoroTimer>>(emptyList())
-    val pomodoroTimers: StateFlow<List<PomodoroTimer>> = _pomodoroTimers
 
-    suspend fun refreshTimersFromFirebase() {
-        val uid = auth.currentUser?.uid ?: return
-
-        val snapshot = firestore.collection("users")
-            .document(uid)
-            .collection("pomodoroTimers")
-            .get()
-            .await()
-
-        val timers = snapshot.documents.mapNotNull { doc ->
-            doc.toObject(PomodoroTimer::class.java)?.copy(id = doc.id)
-        }
-
-        pomodoroTimerDao.deleteAll() // limpa cache local
-
-        // Insere convertendo para entidade
-        pomodoroTimerDao.insertAll(timers.map { it.toEntity(isSynced = true) })
-
-        _pomodoroTimers.value = timers
-    }
-
-    suspend fun addTimer(timer: PomodoroTimer) {
-        val uid = auth.currentUser?.uid ?: return
-        val docRef = firestore.collection("users")
-            .document(uid)
-            .collection("pomodoroTimers")
-            .document()
-
-        val timerWithId = timer.copy(id = docRef.id)
-        docRef.set(timerWithId).await()
-
-        pomodoroTimerDao.insertTimer(timerWithId.toEntity(isSynced = true))
-
-        _pomodoroTimers.value = _pomodoroTimers.value + timerWithId
-    }
-
-    suspend fun updateTimer(timer: PomodoroTimer) {
-        val uid = auth.currentUser?.uid ?: return
-        val remoteId = timer.id ?: return
-
-        firestore.collection("users")
-            .document(uid)
-            .collection("pomodoroTimers")
-            .document(remoteId)
-            .set(timer)
-            .await()
-
-        pomodoroTimerDao.updateTimer(timer.toEntity(isSynced = true))
-
-        _pomodoroTimers.value = _pomodoroTimers.value.map {
-            if (it.id == remoteId) timer else it
+    fun getAllTimersFlow(): Flow<List<PomodoroTimer>> {
+        return dao.getAllTimers().map { list ->
+            list.map { it.toDomain() }
         }
     }
 
-    suspend fun deleteTimer(remoteId: String) {
-        val uid = auth.currentUser?.uid ?: return
+    suspend fun insertTimer(timer: PomodoroTimer) {
+        dao.insertTimer(timer.toEntity(isSynced = false))
+        syncUnsyncedTimers()
+    }
 
-        firestore.collection("users")
-            .document(uid)
-            .collection("pomodoroTimers")
-            .document(remoteId)
-            .delete()
-            .await()
+    suspend fun deleteTimer(timer: PomodoroTimer) {
+        timer.id.takeIf { it.isNotEmpty() }?.let { remoteId ->
+            firestore.collection("pomodoroTimers").document(remoteId).delete()
+        }
+        // Apaga local (pode usar remoteId ou buscar local)
+        dao.deleteTimerByRemoteId(timer.id)
+    }
 
-        pomodoroTimerDao.deleteTimerByRemoteId(remoteId)
+    suspend fun syncUnsyncedTimers() {
+        val unsynced = dao.getUnsyncedTimers()
+        unsynced.collect { list ->
+            list.forEach { entity ->
+                val timer = entity.toDomain()
+                val docRef = if (timer.id.isNotEmpty()) {
+                    firestore.collection("pomodoroTimers").document(timer.id)
+                } else {
+                    firestore.collection("pomodoroTimers").document()
+                }
+                val id = docRef.id
+                val timerWithId = timer.copy(id = id)
+                docRef.set(timerWithId).addOnSuccessListener {
+                    // Atualiza o local marcando como sincronizado e atualizando remoteId
+                    val updatedEntity = entity.copy(id = entity.id, remoteId = id, isSynced = true)
+                    // Usar coroutine para update no banco
+                    // Importante: Atualize com DAO
+                }
+            }
+        }
+    }
 
-        _pomodoroTimers.value = _pomodoroTimers.value.filter { it.id != remoteId }
+    fun listenToRemoteChanges(onChanged: (List<PomodoroTimer>) -> Unit) {
+        firestore.collection("pomodoroTimers")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null || snapshot == null) return@addSnapshotListener
+
+                val timers = snapshot.documents.mapNotNull { doc ->
+                    doc.toObject(PomodoroTimer::class.java)?.copy(id = doc.id)
+                }
+                onChanged(timers)
+            }
     }
 }

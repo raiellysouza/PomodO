@@ -4,18 +4,12 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.example.pomodo.data.PomodoroTimerRepository
 import com.example.pomodo.model.PomodoroTimer
-import com.example.pomodo.notification.AlarmScheduler
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
-import com.example.pomodo.local.AppDatabase
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 enum class TimerState {
@@ -26,12 +20,13 @@ enum class TimerMode {
     FOCUS, SHORT_BREAK, LONG_BREAK
 }
 
-class PomodoroViewModel(
-    application: Application,
-    private val pomodoroTimerRepository: PomodoroTimerRepository
-) : AndroidViewModel(application) {
+class PomodoroViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val alarmScheduler = AlarmScheduler(application)
+    // Aqui você deve injetar seu repositório que cuida de Room + Firestore (remova UserRepository)
+    private val repo = PomodoroTimerRepository(application) // ajuste conforme seu repo
+
+    private val _timers = MutableStateFlow<List<PomodoroTimer>>(emptyList())
+    val availableTimers: StateFlow<List<PomodoroTimer>> = _timers.asStateFlow()
 
     private val _focusTime = MutableStateFlow(25 * 60)
     val focusTime: StateFlow<Int> = _focusTime.asStateFlow()
@@ -57,60 +52,46 @@ class PomodoroViewModel(
     private val _currentMode = MutableStateFlow(TimerMode.FOCUS)
     val currentMode: StateFlow<TimerMode> = _currentMode.asStateFlow()
 
-    private val _availableTimers = MutableStateFlow<List<PomodoroTimer>>(emptyList())
-    val availableTimers: StateFlow<List<PomodoroTimer>> = _availableTimers.asStateFlow()
-
     private val _selectedPomodoroTimer = MutableStateFlow<PomodoroTimer?>(null)
     val selectedPomodoroTimer: StateFlow<PomodoroTimer?> = _selectedPomodoroTimer.asStateFlow()
 
-    private val _notificationsEnabled = MutableStateFlow(true)
+    private val _notificationsEnabled = MutableStateFlow(false)
     val notificationsEnabled: StateFlow<Boolean> = _notificationsEnabled.asStateFlow()
+
+    fun toggleNotifications(enabled: Boolean) {
+        _notificationsEnabled.value = enabled
+    }
 
     private var timerJob: Job? = null
 
     init {
-        viewModelScope.launch {
-            pomodoroTimerRepository.pomodoroTimers.collectLatest { timers ->
-                _availableTimers.value = timers
-                if (_selectedPomodoroTimer.value == null && timers.isNotEmpty()) {
-                    selectPomodoroTimer(timers.first())
-                } else if (timers.isEmpty()) {
-                    resetToDefaultTimes()
-                }
-            }
-        }
+        loadTimers()
+    }
 
-        viewModelScope.launch {
-            pomodoroTimerRepository.refreshTimersFromFirebase()
+    fun loadTimers() = viewModelScope.launch {
+        // Carregue timers do repositório, que busca do Room e Firestore
+        val list = repo.getAllTimers()
+        _timers.value = list
+        if (_selectedPomodoroTimer.value == null && list.isNotEmpty()) {
+            selectPomodoroTimer(list.first())
         }
+    }
 
-        resetTimer()
+    fun saveTimer(timer: PomodoroTimer) = viewModelScope.launch {
+        repo.saveTimer(timer)
+        loadTimers()
     }
 
     fun startTimer() {
         if (_timerState.value == TimerState.STOPPED || _timerState.value == TimerState.PAUSED) {
             _timerState.value = TimerState.RUNNING
             timerJob?.cancel()
-
-            val title = when (_currentMode.value) {
-                TimerMode.FOCUS -> "Foco Iniciado!"
-                TimerMode.SHORT_BREAK -> "Pausa Curta Iniciada!"
-                TimerMode.LONG_BREAK -> "Pausa Longa Iniciada!"
-            }
-            val message = when (_currentMode.value) {
-                TimerMode.FOCUS -> "Sua sessão de foco começou. Mantenha o ritmo!"
-                TimerMode.SHORT_BREAK -> "Sua pausa curta começou. Relaxe um pouco!"
-                TimerMode.LONG_BREAK -> "Sua pausa longa começou. Descanse bem!"
-            }
-            sendNotification(title, message, 1000)
-
             timerJob = viewModelScope.launch {
                 while (_currentTime.value > 0 && _timerState.value == TimerState.RUNNING) {
                     delay(1000)
                     _currentTime.value--
                 }
-
-                if (_currentTime.value == 0 && _timerState.value == TimerState.RUNNING) {
+                if (_currentTime.value == 0) {
                     handleTimerCompletion()
                 }
             }
@@ -121,7 +102,6 @@ class PomodoroViewModel(
         if (_timerState.value == TimerState.RUNNING) {
             _timerState.value = TimerState.PAUSED
             timerJob?.cancel()
-            cancelAllAlarms()
         }
     }
 
@@ -131,44 +111,39 @@ class PomodoroViewModel(
         _currentMode.value = TimerMode.FOCUS
         _cyclesCompleted.value = 0
         _currentTime.value = _selectedPomodoroTimer.value?.focusMinutes?.times(60) ?: _focusTime.value
-        cancelAllAlarms()
     }
 
     private fun handleTimerCompletion() {
-        _timerState.value = TimerState.STOPPED
-        _currentTime.value = 0
-
         when (_currentMode.value) {
             TimerMode.FOCUS -> {
                 _cyclesCompleted.value++
-                sendNotification("Tempo de Foco Encerrado!", "Sua sessão de foco terminou. É hora de uma pausa!", 1001)
                 if (_cyclesCompleted.value > 0 && _cyclesCompleted.value % _longBreakInterval.value == 0) {
                     _currentMode.value = TimerMode.LONG_BREAK
                     _currentTime.value = _longBreakTime.value
-                    sendNotification("Parabéns! Ciclo Concluído!", "Que tal recarregar as energias e partir para o próximo desafio?", 1004)
                 } else {
                     _currentMode.value = TimerMode.SHORT_BREAK
                     _currentTime.value = _shortBreakTime.value
                 }
+                _timerState.value = TimerState.STOPPED
                 startTimer()
             }
             TimerMode.SHORT_BREAK -> {
-                sendNotification("Pausa Curta Encerrada!", "Hora de voltar ao foco!", 1002)
                 _currentMode.value = TimerMode.FOCUS
                 _currentTime.value = _focusTime.value
+                _timerState.value = TimerState.STOPPED
                 startTimer()
             }
             TimerMode.LONG_BREAK -> {
-                sendNotification("Pausa Longa Encerrada!", "Hora de iniciar um novo desafio!", 1003)
                 _currentMode.value = TimerMode.FOCUS
                 _currentTime.value = _focusTime.value
                 _cyclesCompleted.value = 0
+                _timerState.value = TimerState.STOPPED
             }
         }
     }
 
     fun startNextMode() {
-        if (_timerState.value == TimerState.STOPPED && _currentMode.value == TimerMode.FOCUS && _cyclesCompleted.value == 0) {
+        if (_timerState.value == TimerState.STOPPED) {
             startTimer()
         }
     }
@@ -181,33 +156,11 @@ class PomodoroViewModel(
         _longBreakInterval.value = timer.longBreakInterval
 
         if (_timerState.value == TimerState.STOPPED) {
-            _currentTime.value = _focusTime.value
-            _currentMode.value = TimerMode.FOCUS
-            _cyclesCompleted.value = 0
-        }
-    }
-
-    fun addPomodoroTimer(timer: PomodoroTimer) {
-        viewModelScope.launch {
-            pomodoroTimerRepository.addTimer(timer)
-        }
-    }
-
-    fun updatePomodoroTimer(timer: PomodoroTimer) {
-        viewModelScope.launch {
-            pomodoroTimerRepository.updateTimer(timer)
-        }
-    }
-
-    fun deletePomodoroTimer(timerId: String) {
-        viewModelScope.launch {
-            pomodoroTimerRepository.deleteTimer(timerId)
-        }
-    }
-
-    fun refreshTimersFromBackend() {
-        viewModelScope.launch {
-            pomodoroTimerRepository.refreshTimersFromFirebase()
+            when (_currentMode.value) {
+                TimerMode.FOCUS -> _currentTime.value = _focusTime.value
+                TimerMode.SHORT_BREAK -> _currentTime.value = _shortBreakTime.value
+                TimerMode.LONG_BREAK -> _currentTime.value = _longBreakTime.value
+            }
         }
     }
 
@@ -244,46 +197,11 @@ class PomodoroViewModel(
         _cyclesCompleted.value = 0
     }
 
-    private fun resetToDefaultTimes() {
-        _focusTime.value = 25 * 60
-        _shortBreakTime.value = 5 * 60
-        _longBreakTime.value = 15 * 60
-        _longBreakInterval.value = 4
-        _cyclesCompleted.value = 0
-        _currentMode.value = TimerMode.FOCUS
-        if (_timerState.value == TimerState.STOPPED) {
-            _currentTime.value = _focusTime.value
-        }
-    }
-
-    fun toggleNotifications(enabled: Boolean) {
-        _notificationsEnabled.value = enabled
-    }
-
-    private fun sendNotification(title: String, message: String, notificationId: Int) {
-        if (_notificationsEnabled.value) {
-            alarmScheduler.scheduleAlarm(
-                delayMillis = 0L,
-                title = title,
-                message = message,
-                notificationId = notificationId
-            )
-        }
-    }
-
-    private fun cancelAllAlarms() {
-        (1000..1004).forEach { alarmScheduler.cancelAlarm(it) }
-    }
-
     class Factory(private val application: Application) : ViewModelProvider.Factory {
+        @Suppress("UNCHECKED_CAST")
         override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(PomodoroViewModel::class.java)) {
-                @Suppress("UNCHECKED_CAST")
-                val firestore = FirebaseFirestore.getInstance()
-                val auth = FirebaseAuth.getInstance()
-                val pomodoroTimerDao = AppDatabase.getDatabase(application).pomodoroTimerDao()
-                val pomodoroTimerRepository = PomodoroTimerRepository(firestore, auth, pomodoroTimerDao)
-                return PomodoroViewModel(application, pomodoroTimerRepository) as T
+                return PomodoroViewModel(application) as T
             }
             throw IllegalArgumentException("Unknown ViewModel class")
         }

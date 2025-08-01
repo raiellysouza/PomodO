@@ -5,6 +5,16 @@
 # For more details, see
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
+# Manter a classe PomodoroTimer e seu construtor vazio para desserialização do Firestore
+-keepclassmembers class com.example.pomodo.model.PomodoroTimer {
+    public <init>();
+}
+
+# Também mantém os campos públicos e privados usados na serialização (opcional)
+-keepclassmembers class com.example.pomodo.model.PomodoroTimer {
+    *;
+}
+
 # If your project uses WebView with JS, uncomment the following
 # and specify the fully qualified class name to the JavaScript interface
 # class:

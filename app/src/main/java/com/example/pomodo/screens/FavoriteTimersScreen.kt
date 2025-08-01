@@ -89,8 +89,9 @@ fun FavoriteTimersScreen(
                             showAddEditDialog = true
                         },
                         onDelete = { deletedTimer ->
+                            // Note que id aqui deve ser não-nulo
                             if (deletedTimer.id != null) {
-                                customTimerViewModel.deletePomodoroTimer(deletedTimer.id!!)
+                                customTimerViewModel.deletePomodoroTimer(deletedTimer.id)
                             } else {
                                 println("Erro: Tentativa de deletar timer sem ID remoto.")
                             }
@@ -181,36 +182,99 @@ fun AddEditTimerDialog(
                     value = timerName,
                     onValueChange = { timerName = it },
                     label = { Text("Nome do Timer") },
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp)
                 )
                 Text("Foco: $focusMinutes minutos")
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceAround) {
-                    IconButton(onClick = { focusMinutes = (focusMinutes - 1).coerceAtLeast(1) }) { Text(text = "-", style = MaterialTheme.typography.headlineSmall) }
-                    Slider(value = focusMinutes.toFloat(), onValueChange = { focusMinutes = it.toInt() }, valueRange = 1f..60f, steps = 58, modifier = Modifier.weight(1f))
-                    IconButton(onClick = { focusMinutes = (focusMinutes + 1).coerceAtMost(60) }) { Text(text = "+", style = MaterialTheme.typography.headlineSmall) }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceAround,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    IconButton(onClick = { focusMinutes = (focusMinutes - 1).coerceAtLeast(1) }) {
+                        Text(text = "-", style = MaterialTheme.typography.headlineSmall)
+                    }
+                    Slider(
+                        value = focusMinutes.toFloat(),
+                        onValueChange = { focusMinutes = it.toInt() },
+                        valueRange = 1f..60f,
+                        steps = 58,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(onClick = { focusMinutes = (focusMinutes + 1).coerceAtMost(60) }) {
+                        Text(text = "+", style = MaterialTheme.typography.headlineSmall)
+                    }
                 }
+
                 Text("Pausa Curta: $shortBreakMinutes minutos")
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceAround) {
-                    IconButton(onClick = { shortBreakMinutes = (shortBreakMinutes - 1).coerceAtLeast(1) }) { Text(text = "-", style = MaterialTheme.typography.headlineSmall) }
-                    Slider(value = shortBreakMinutes.toFloat(), onValueChange = { shortBreakMinutes = it.toInt() }, valueRange = 1f..30f, steps = 28, modifier = Modifier.weight(1f))
-                    IconButton(onClick = { shortBreakMinutes = (shortBreakMinutes + 1).coerceAtMost(30) }) { Text(text = "+", style = MaterialTheme.typography.headlineSmall) }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceAround,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    IconButton(onClick = { shortBreakMinutes = (shortBreakMinutes - 1).coerceAtLeast(1) }) {
+                        Text(text = "-", style = MaterialTheme.typography.headlineSmall)
+                    }
+                    Slider(
+                        value = shortBreakMinutes.toFloat(),
+                        onValueChange = { shortBreakMinutes = it.toInt() },
+                        valueRange = 1f..30f,
+                        steps = 28,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(onClick = { shortBreakMinutes = (shortBreakMinutes + 1).coerceAtMost(30) }) {
+                        Text(text = "+", style = MaterialTheme.typography.headlineSmall)
+                    }
                 }
+
                 Text("Pausa Longa: $longBreakMinutes minutos")
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceAround) {
-                    IconButton(onClick = { longBreakMinutes = (longBreakMinutes - 1).coerceAtLeast(5) }) { Text(text = "-", style = MaterialTheme.typography.headlineSmall) }
-                    Slider(value = longBreakMinutes.toFloat(), onValueChange = { longBreakMinutes = it.toInt() }, valueRange = 5f..60f, steps = 54, modifier = Modifier.weight(1f))
-                    IconButton(onClick = { longBreakMinutes = (longBreakMinutes + 1).coerceAtMost(60) }) { Text(text = "+", style = MaterialTheme.typography.headlineSmall) }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceAround,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    IconButton(onClick = { longBreakMinutes = (longBreakMinutes - 1).coerceAtLeast(5) }) {
+                        Text(text = "-", style = MaterialTheme.typography.headlineSmall)
+                    }
+                    Slider(
+                        value = longBreakMinutes.toFloat(),
+                        onValueChange = { longBreakMinutes = it.toInt() },
+                        valueRange = 5f..60f,
+                        steps = 54,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(onClick = { longBreakMinutes = (longBreakMinutes + 1).coerceAtMost(60) }) {
+                        Text(text = "+", style = MaterialTheme.typography.headlineSmall)
+                    }
                 }
+
                 Text("Intervalo Pausa Longa: $longBreakInterval ciclos")
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceAround) {
-                    IconButton(onClick = { longBreakInterval = (longBreakInterval - 1).coerceAtLeast(1) }) { Text(text = "-", style = MaterialTheme.typography.headlineSmall) }
-                    Slider(value = longBreakInterval.toFloat(), onValueChange = { longBreakInterval = it.toInt() }, valueRange = 1f..10f, steps = 8, modifier = Modifier.weight(1f))
-                    IconButton(onClick = { longBreakInterval = (longBreakInterval + 1).coerceAtMost(10) }) { Text(text = "+", style = MaterialTheme.typography.headlineSmall) }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceAround,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    IconButton(onClick = { longBreakInterval = (longBreakInterval - 1).coerceAtLeast(1) }) {
+                        Text(text = "-", style = MaterialTheme.typography.headlineSmall)
+                    }
+                    Slider(
+                        value = longBreakInterval.toFloat(),
+                        onValueChange = { longBreakInterval = it.toInt() },
+                        valueRange = 1f..10f,
+                        steps = 8,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(onClick = { longBreakInterval = (longBreakInterval + 1).coerceAtMost(10) }) {
+                        Text(text = "+", style = MaterialTheme.typography.headlineSmall)
+                    }
                 }
             }
         },
         confirmButton = {
             Button(onClick = {
+                if (timerName.isBlank()) return@Button // Evitar salvar sem nome
+
                 val newTimer = PomodoroTimer(
                     id = timer?.id,
                     name = timerName,

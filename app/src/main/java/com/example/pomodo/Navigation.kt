@@ -21,7 +21,6 @@ import com.example.pomodo.screens.ProfileScreen
 import com.example.pomodo.ui.profile.ProfileViewModel
 import com.example.pomodo.ui.theme.ThemeViewModel
 import com.example.pomodo.PomodoroViewModel
-import com.example.pomodo.data.UserRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
