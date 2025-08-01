@@ -1,11 +1,13 @@
 package com.example.pomodo.ui.timer
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.pomodo.data.PomodoroTimerRepository
 import com.example.pomodo.model.PomodoroTimer
+import com.example.pomodo.local.AppDatabase
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,8 +15,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import com.example.pomodo.local.AppDatabase
-import android.util.Log
 
 class PomodoroTimerViewModel(application: Application) : AndroidViewModel(application) {
 

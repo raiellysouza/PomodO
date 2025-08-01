@@ -14,7 +14,8 @@ navigationCompose = "2.7.0"
 lifecycleViewmodelCompose = "2.8.2"
 datastorePreferences = "1.0.0"
 firebaseBom = "33.1.1" # Verifique a versão mais recente em firebase.google.com/docs/android/setup
-material = "1.12.0" # Verifique a versão mais recente
+material = "1.12.0"
+firebaseStorageKtx = "22.0.0" # Verifique a versão mais recente
 
 
 [libraries]
@@ -41,6 +42,7 @@ firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.r
 firebase-auth-ktx = { group = "com.google.firebase", name = "firebase-auth-ktx" }
 firebase-firestore-ktx = { group = "com.google.firebase", name = "firebase-firestore-ktx" }
 google-android-material = { group = "com.google.android.material", name = "material", version.ref = "material" }
+firebase-storage-ktx = { group = "com.google.firebase", name = "firebase-storage-ktx", version.ref = "firebaseStorageKtx" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

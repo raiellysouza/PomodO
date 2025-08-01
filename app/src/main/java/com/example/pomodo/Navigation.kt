@@ -1,36 +1,30 @@
 package com.example.pomodo
 
-import androidx.compose.animation.AnimatedContent
+import android.app.Application
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.with
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import com.example.pomodo.screens.FavoriteTimersScreen
-import com.example.pomodo.screens.HelpScreen
-import com.example.pomodo.screens.HomeScreen
-import com.example.pomodo.screens.LoginScreen
-import com.example.pomodo.screens.RegisterScreen
-import com.example.pomodo.screens.SettingsScreen
+import com.example.pomodo.screens.*
 import com.example.pomodo.ui.auth.AuthViewModel
+import com.example.pomodo.screens.ProfileScreen
+import com.example.pomodo.ui.profile.ProfileViewModel
 import com.example.pomodo.ui.theme.ThemeViewModel
+import com.example.pomodo.PomodoroViewModel
+import com.example.pomodo.data.UserRepository
 import com.google.firebase.auth.FirebaseAuth
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.compose.material3.Text
-import android.app.Application
-import androidx.compose.ui.platform.LocalContext
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.storage.FirebaseStorage
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
     object Login : Screen("login", "Login", Icons.Filled.Person)
@@ -44,22 +38,28 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
 
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
-fun PomodONavHost(navController: NavHostController) {
+fun PomodONavHost(navController: NavHostController, onBackProfile: () -> Unit) {
     val auth = FirebaseAuth.getInstance()
     val startDestination = Screen.Login.route
-
     val context = LocalContext.current.applicationContext
     val application = context as Application
+    val firestore = FirebaseFirestore.getInstance()
+    val storage = FirebaseStorage.getInstance()
+    val userRepository = UserRepository(auth, firestore, storage)
 
     NavHost(navController = navController, startDestination = startDestination) {
         composable(Screen.Login.route, enterTransition = { fadeIn() }, exitTransition = { fadeOut() }) {
+            val authViewModel: AuthViewModel = viewModel(factory = AuthViewModel.Factory(auth))
             LoginScreen(
+                authViewModel = authViewModel,
                 onLoginSuccess = { navController.navigate(Screen.Home.route) { popUpTo(Screen.Login.route) { inclusive = true } } },
                 onNavigateToRegister = { navController.navigate(Screen.Register.route) }
             )
         }
         composable(Screen.Register.route, enterTransition = { fadeIn() }, exitTransition = { fadeOut() }) {
+            val authViewModel: AuthViewModel = viewModel(factory = AuthViewModel.Factory(auth))
             RegisterScreen(
+                authViewModel = authViewModel,
                 onRegistrationSuccess = { navController.navigate(Screen.Home.route) { popUpTo(Screen.Register.route) { inclusive = true } } },
                 onNavigateToLogin = { navController.navigate(Screen.Login.route) }
             )
@@ -82,7 +82,11 @@ fun PomodONavHost(navController: NavHostController) {
             FavoriteTimersScreen(pomodoroViewModel, themeViewModel)
         }
         composable(Screen.Profile.route, enterTransition = { slideInHorizontally { it } + fadeIn() }, exitTransition = { slideOutHorizontally { -it } + fadeOut() }) {
-            Text("Tela de Perfil (Em desenvolvimento)")
+            val profileViewModel: ProfileViewModel = viewModel(factory = ProfileViewModel.Factory(userRepository))
+            ProfileScreen(
+                viewModel = profileViewModel,
+                onBack = onBackProfile
+            )
         }
     }
 }

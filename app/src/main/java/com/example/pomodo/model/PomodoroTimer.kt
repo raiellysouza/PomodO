@@ -9,3 +9,17 @@ data class PomodoroTimer(
     val longBreakInterval: Int = 0
 )
 
+data class UserProfile(
+    val uid: String,
+    val displayName: String,
+    val photoUrl: String
+)
+
+data class StatsData(
+    val daily: Long,
+    val weekly: Long,
+    val monthly: Long,
+    val last90Days: Long
+)
+
+
